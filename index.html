@@ -14,7 +14,6 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
-
 :root{
   --brand:#2b3a9f; --brand-2:#212e82; --brand-soft:#e7eafb;
   --paper:#f1f1ed; --surface:#ffffff; --surface-2:#f7f7f4; --ink:#161a33; --muted:#6a6e80; --line:#e0e0d9; --grid:rgba(22,26,51,.08);
@@ -181,7 +180,7 @@ a{text-decoration:none}
 <div id="authView" class="d-none">
   <div class="auth-wrap">
     <section class="auth-hero">
-      <div class="brand-lg"><i class="bi bi-journal-bookmark-fill"></i>Money Management System</div>
+      <div class="brand-lg"><i class="bi bi-journal-bookmark-fill"></i>Money Manager</div>
       <div>
         <h1>Know where your money is, and what you are worth.</h1>
         <ul>
@@ -190,11 +189,11 @@ a{text-decoration:none}
           <li><i class="bi bi-check2-circle"></i><span>Every user sees only their own data, protected by Firebase security rules.</span></li>
         </ul>
       </div>
-      <div class="small" style="color:#7f86b3"></div>
+      <div class="small" style="color:#7f86b3">Your data stays in your own Firebase project.</div>
     </section>
     <section class="auth-panel">
       <div class="auth-card">
-        <div class="brand-lg d-lg-none mb-3" style="color:var(--ink)"><i class="bi bi-journal-bookmark-fill" style="color:var(--brand)"></i>Money Management System</div>
+        <div class="brand-lg d-lg-none mb-3" style="color:var(--ink)"><i class="bi bi-journal-bookmark-fill" style="color:var(--brand)"></i>Money Manager</div>
         <div id="authAlert"></div>
         <form id="loginForm" class="vstack gap-3" autocomplete="on">
           <div><h2>Welcome back</h2><div class="text-muted2">Sign in to open your dashboard.</div></div>
@@ -219,8 +218,7 @@ a{text-decoration:none}
         </form>
         <hr class="my-4">
         <details id="fbSetup" class="small">
-          <summary class="fw-semibold" style="cursor:pointer"><span id="fbState" class="pill pill-muted ms-1"></span></summary>
-         
+          <summary class="fw-semibold" style="cursor:pointer">Firebase setup <span id="fbState" class="pill pill-muted ms-1"></span></summary>
           
         </details>
         <button class="btn btn-soft w-100 mt-3" type="button" data-act="startDemo"><i class="bi bi-play-circle me-1"></i>Try demo mode (data stays in this browser)</button>
@@ -232,7 +230,7 @@ a{text-decoration:none}
 <!-- ============ APP ============ -->
 <div id="appView" class="d-none">
   <aside id="sidebar" class="app-sidebar" aria-label="Main navigation">
-    <div class="sb-brand"><i class="bi bi-journal-bookmark-fill"></i>Money Management System</div>
+    <div class="sb-brand"><i class="bi bi-journal-bookmark-fill"></i>Money Manager</div>
     <nav class="sb-nav" id="sbNav"></nav>
     <div class="sb-foot" id="sbFoot"></div>
   </aside>
@@ -251,6 +249,7 @@ a{text-decoration:none}
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="#" data-act="addAsset"><i class="bi bi-gem me-2"></i>Add asset</a></li>
             <li><a class="dropdown-item" href="#" data-act="addLiability"><i class="bi bi-credit-card-2-front me-2"></i>Add liability</a></li>
+            <li><a class="dropdown-item" href="#" data-act="addLoanGiven"><i class="bi bi-cash-coin me-2"></i>Give a loan</a></li>
             <li><a class="dropdown-item" href="#" data-act="addAccount"><i class="bi bi-wallet2 me-2"></i>Add account</a></li>
           </ul>
         </div>
@@ -319,7 +318,7 @@ const DEFAULT_EXPENSE_CATS = {
 const DEFAULT_INCOME_CATS = ['Service Income', 'Employment', 'Business Income', 'Passive Income', 'Other Income'];
 const DEFAULT_SOURCES = ['Google Ads Client', 'Website Maintenance', 'Freelancing', 'Consulting', 'Affiliate Income', 'Salary', 'Business', 'Other'];
 const DEFAULT_SETTINGS = { defaultCurrency: 'BDT', rates: { ...DEFAULT_RATES }, weekStart: 6, allowNegative: false, budgetAlertPct: 80, notify: { budget: true, due: true, browser: false }, initialized: false };
-const COLS = ['accounts', 'income', 'expenses', 'transfers', 'assets', 'liabilities', 'receivables', 'payables', 'budgets', 'recurringTransactions', 'categories', 'incomeSources'];
+const COLS = ['accounts', 'income', 'expenses', 'transfers', 'assets', 'liabilities', 'loansGiven', 'receivables', 'payables', 'budgets', 'recurringTransactions', 'categories', 'incomeSources'];
 
 /* =====================================================================
    1. UTILITIES
@@ -379,6 +378,7 @@ const paidPrincipal = l => round2((l.payments || []).reduce((t, p) => t + (+p.am
 const liabOutstanding = l => Math.max(0, round2((+l.originalAmount || 0) - paidPrincipal(l) + (+l.adjust || 0)));
 const paidOf = r => round2((r.payments || []).reduce((t, p) => t + (+p.amount || 0), 0));
 const dueStatus = r => { const p = paidOf(r); if (p >= (+r.amount || 0) - 0.005) return 'Paid'; if (r.dueDate && r.dueDate < today()) return 'Overdue'; return p > 0 ? 'Partially Paid' : 'Pending'; };
+const loanDueStatus = l => { const out = liabOutstanding(l); if (out <= 0.005) return 'Paid'; if (l.dueDate && l.dueDate < today()) return 'Overdue'; return out < (+l.originalAmount || 0) - 0.005 ? 'Partially Paid' : 'Pending'; };
 
 /** Account balance effects of a record. kind ∈ income|expenses|transfers|assets|liabilities */
 function effectsOf(kind, r) {
@@ -395,6 +395,9 @@ function effectsOf(kind, r) {
   } else if (kind === 'liabilities') {
     if (r.receivedAccountId && r.receivedAccountAmount) out.push({ accountId: r.receivedAccountId, delta: +r.receivedAccountAmount, date: r.startDate });
     (r.payments || []).forEach(p => { if (p.accountId) out.push({ accountId: p.accountId, delta: -(+p.accountAmount || 0), date: p.date }); });
+  } else if (kind === 'loansGiven') {
+    if (r.givenAccountId && r.givenAccountAmount) out.push({ accountId: r.givenAccountId, delta: -r.givenAccountAmount, date: r.startDate });
+    (r.payments || []).forEach(p => { if (p.accountId) out.push({ accountId: p.accountId, delta: +(+p.accountAmount || 0), date: p.date }); });
   }
   return out;
 }
@@ -454,20 +457,22 @@ function currentTotals() {
   const cash = round2(D.accounts.reduce((t, a) => t + (+a.currentBalance || 0) * Eng.rate(a.currency, rates), 0));
   const assets = round2(D.assets.filter(a => a.status !== 'sold').reduce((t, a) => t + Eng.toBDT((+a.currentValue || 0) * (+a.quantity || 1), a.currency, rates), 0));
   const liab = round2(D.liabilities.reduce((t, l) => t + Eng.toBDT(liabOutstanding(l), l.currency, rates), 0));
-  return { cash, assets, liab, net: round2(cash + assets - liab) };
+  const lent = round2(D.loansGiven.reduce((t, l) => t + Eng.toBDT(liabOutstanding(l), l.currency, rates), 0));
+  return { cash, assets, liab, lent, net: round2(cash + assets + lent - liab) };
 }
 /** Historical net worth engine (cash from ledger movements, assets/liabilities from their histories) */
 function nw() {
   if (_nv === State.ver && _nw) return _nw;
   const rates = State.settings.rates, accMap = Object.fromEntries(D.accounts.map(a => [a.id, a])), pts = [];
-  [['income', D.income], ['expenses', D.expenses], ['transfers', D.transfers], ['assets', D.assets], ['liabilities', D.liabilities]].forEach(([k, arr]) => arr.forEach(r => effectsOf(k, r).forEach(e => pts.push({ date: e.date || '0000-00-00', bdt: e.delta * Eng.rate(accMap[e.accountId]?.currency || 'BDT', rates) }))));
+  [['income', D.income], ['expenses', D.expenses], ['transfers', D.transfers], ['assets', D.assets], ['liabilities', D.liabilities], ['loansGiven', D.loansGiven]].forEach(([k, arr]) => arr.forEach(r => effectsOf(k, r).forEach(e => pts.push({ date: e.date || '0000-00-00', bdt: e.delta * Eng.rate(accMap[e.accountId]?.currency || 'BDT', rates) }))));
   D.accounts.forEach(a => pts.push({ date: a.openingDate || '0000-00-00', bdt: (+a.openingBalance || 0) * Eng.rate(a.currency, rates) }));
   pts.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   const dates = [], cum = []; let s = 0; pts.forEach(p => { s += p.bdt; dates.push(p.date); cum.push(s); });
   const cashAt = d => { let lo = 0, hi = dates.length - 1, ix = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (dates[mid] <= d) { ix = mid; lo = mid + 1; } else hi = mid - 1; } return ix < 0 ? 0 : round2(cum[ix]); };
   const assetsAt = d => round2(D.assets.reduce((t, a) => t + assetValueAt(a, d, rates), 0));
   const liabAt = d => round2(D.liabilities.reduce((t, l) => t + liabilityAt(l, d, rates), 0));
-  _nw = { cashAt, assetsAt, liabAt, netAt: d => round2(cashAt(d) + assetsAt(d) - liabAt(d)) };
+  const lentAt = d => round2(D.loansGiven.reduce((t, l) => t + liabilityAt(l, d, rates), 0));
+  _nw = { cashAt, assetsAt, liabAt, lentAt, netAt: d => round2(cashAt(d) + assetsAt(d) + lentAt(d) - liabAt(d)) };
   _nv = State.ver; return _nw;
 }
 
@@ -964,7 +969,7 @@ ACTIONS.viewAtt = async d => {
 };
 
 /* ---------- ACCOUNTS ---------- */
-const accountUsed = id => D.income.some(r => r.accountId === id) || D.expenses.some(r => r.accountId === id) || D.transfers.some(r => r.fromId === id || r.toId === id) || D.assets.some(r => r.payAccountId === id || r.soldAccountId === id) || D.liabilities.some(r => r.receivedAccountId === id || (r.payments || []).some(p => p.accountId === id)) || D.recurringTransactions.some(r => r.accountId === id);
+const accountUsed = id => D.income.some(r => r.accountId === id) || D.expenses.some(r => r.accountId === id) || D.transfers.some(r => r.fromId === id || r.toId === id) || D.assets.some(r => r.payAccountId === id || r.soldAccountId === id) || D.liabilities.some(r => r.receivedAccountId === id || (r.payments || []).some(p => p.accountId === id)) || D.loansGiven.some(r => r.givenAccountId === id || (r.payments || []).some(p => p.accountId === id)) || D.recurringTransactions.some(r => r.accountId === id);
 function openAccountForm(o = {}) {
   const ex = o.id ? acct(o.id) : null;
   const used = ex ? accountUsed(ex.id) : false;
@@ -1003,7 +1008,7 @@ ACTIONS.delAccount = async d => {
 ACTIONS.toggleAccount = async d => { const a = acct(d.id); if (a) await commit([{ op: 'update', col: 'accounts', id: a.id, data: { active: a.active === false } }]); };
 function expectedBalance(a) {
   let bal = +a.openingBalance || 0;
-  [['income', D.income], ['expenses', D.expenses], ['transfers', D.transfers], ['assets', D.assets], ['liabilities', D.liabilities]].forEach(([k, arr]) => arr.forEach(r => effectsOf(k, r).forEach(e => { if (e.accountId === a.id) bal += e.delta; })));
+  [['income', D.income], ['expenses', D.expenses], ['transfers', D.transfers], ['assets', D.assets], ['liabilities', D.liabilities], ['loansGiven', D.loansGiven]].forEach(([k, arr]) => arr.forEach(r => effectsOf(k, r).forEach(e => { if (e.accountId === a.id) bal += e.delta; })));
   return round2(bal);
 }
 ACTIONS.verifyBalances = () => {
@@ -1033,7 +1038,7 @@ function openAssetForm(o = {}) {
     { name: 'category', label: 'Asset category', type: 'select', options: ASSET_CATS, col: 6 },
     { name: 'purchaseDate', label: 'Purchase date', type: 'date', required: true, col: 6 },
     { name: 'currency', label: 'Currency', type: 'select', options: CUR_LIST, col: 3 },
-    { name: 'quantity', label: 'Quantity', type: 'number', min: 0.0001, col: 3 },
+    { name: 'quantity', label: 'Quantity (items)', type: 'number', min: 0.0001, col: 3 },
     { name: 'purchasePrice', label: 'Purchase price (per unit)', type: 'number', required: true, min: 0, col: 6 },
     { name: 'currentValue', label: 'Current estimated value (per unit)', type: 'number', required: true, min: 0, col: 6, help: 'Used for total assets and net worth.' },
     { name: 'location', label: 'Location', col: 6 },
@@ -1043,8 +1048,15 @@ function openAssetForm(o = {}) {
   ];
   openFormModal({
     title: ex ? 'Edit asset' : 'Add asset', fields, values: v,
+    note: '<div id="assetPreview" class="alert alert-secondary py-2 small"></div>',
+    onOpen: form => {
+      const g = n => parseFloat(form.elements[n].value) || 0, box = form.querySelector('#assetPreview');
+      const upd = () => { const q = g('quantity') || 1, cur = form.elements.currency.value; box.className = 'alert py-2 small ' + (q > 1 ? 'alert-warning' : 'alert-secondary'); box.innerHTML = `Prices are <b>per unit</b> and are multiplied by the quantity.<br>Total cost: <b>${fmt(g('purchasePrice') * q, cur)}</b>, total current value: <b>${fmt(g('currentValue') * q, cur)}</b> (quantity ${q}).${q > 1 ? ' Check that the quantity is really more than one.' : ''}`; };
+      ['purchasePrice', 'currentValue', 'quantity'].forEach(n => form.elements[n].addEventListener('input', upd)); form.elements.currency.addEventListener('change', upd); upd();
+    },
     onSubmit: async vals => {
       if (!vals.name) throw new Error('Enter the asset name.');
+      if (vals.quantity > 1 && vals.currentValue * vals.quantity > 20 * Math.max(1, vals.purchasePrice * vals.quantity) && !await confirmDlg(`Quantity is ${vals.quantity} and the current value is more than 20 times the purchase price. Save anyway?`, { ok: 'Save anyway', title: 'Please check the numbers' })) throw new Error('Not saved. Please correct the quantity or prices.');
       const att = await handleAttachment(vals, ex?.attachment);
       const s = buildAssetSave({ ...vals, attachment: att.meta }, ex);
       await commit([...s.ops, ...att.ops], { checks: s.checks }); toast(ex ? 'Asset updated' : 'Asset added');
@@ -1164,6 +1176,78 @@ ACTIONS.delLiability = async d => {
   const l = byId(D.liabilities, d.id); if (!l) return;
   if (!await confirmDlg(`Delete <b>${esc(l.name)}</b>? Money received or paid through it is reversed in your accounts.`, { danger: true, ok: 'Delete', title: 'Delete liability' })) return;
   try { const eo = effectOps(effectsOf('liabilities', l), []); await commit([{ op: 'delete', col: 'liabilities', id: l.id }, ...eo.ops], { checks: eo.checks }); toast('Liability deleted'); } catch (e) { toast(e.message, 'danger'); }
+};
+
+/* ---------- LOANS GIVEN (money lent to others from your own accounts) ---------- */
+function buildLoanGivenSave(vals, ex) {
+  const acc = acct(vals.givenAccountId), orig = round2(vals.originalAmount);
+  const rec = { ...(ex || {}), id: ex?.id || uid(), person: vals.person, currency: vals.currency, originalAmount: orig, startDate: vals.startDate, dueDate: vals.dueDate || '', description: vals.description || '', payments: ex?.payments || [], givenAccountId: vals.givenAccountId || '', givenAccountAmount: acc ? Eng.convert(orig, vals.currency, acc.currency) : 0 };
+  const paid = paidPrincipal(rec);
+  rec.adjust = (vals.currentOutstanding === null || vals.currentOutstanding === undefined) ? (ex?.adjust || 0) : round2(vals.currentOutstanding - (orig - paid));
+  const eo = effectOps(effectsOf('loansGiven', ex), effectsOf('loansGiven', rec));
+  return { rec, ops: [{ op: 'set', col: 'loansGiven', id: rec.id, data: rec }, ...eo.ops], checks: eo.checks };
+}
+function openLoanGivenForm(o = {}) {
+  const ex = o.id ? byId(D.loansGiven, o.id) : null; if (o.id && !ex) return;
+  if (needAccount()) return;
+  const v = ex ? { ...ex, currentOutstanding: liabOutstanding(ex) } : { startDate: today(), currency: State.settings.defaultCurrency, givenAccountId: singleAcc() };
+  const fields = [
+    { name: 'person', label: 'Person / organization', required: true, col: 12, list: [...clientList(), ...vendorList()] },
+    { name: 'currency', label: 'Currency', type: 'select', options: CUR_LIST, col: 4, disabled: !!ex?.payments?.length },
+    { name: 'originalAmount', label: 'Amount given', type: 'number', required: true, min: 0.01, col: 4 },
+    { name: 'currentOutstanding', label: 'Current outstanding', type: 'number', min: 0, col: 4, help: 'Leave equal to the amount given if nothing is repaid yet.' },
+    { name: 'givenAccountId', label: 'Given from account', type: 'select', options: accountOptions(v.givenAccountId), placeholder: 'Select account…', required: true, col: 6, help: 'The amount is deducted from this account now. It is not an expense.' },
+    { name: 'startDate', label: 'Date given', type: 'date', required: true, col: 6 },
+    { name: 'dueDate', label: 'Expected return date', type: 'date', col: 6 },
+    { name: 'description', label: 'Description', type: 'textarea', col: 12 }
+  ];
+  openFormModal({
+    title: ex ? 'Edit loan given' : 'Give a loan', fields, values: v,
+    note: '<div class="alert alert-secondary py-2 small">This is money you lent from your own account. It is deducted now and is not an expense. When it is repaid, choose the account that receives it, it is added back there and is never counted as income.</div>',
+    onSubmit: async vals => {
+      if (!vals.person) throw new Error('Enter who this loan is for.');
+      if (!(vals.originalAmount > 0)) throw new Error('Enter an amount greater than zero.');
+      const s = buildLoanGivenSave({ ...vals, currency: ex?.payments?.length ? ex.currency : vals.currency }, ex);
+      await commit(s.ops, { checks: s.checks }); toast(ex ? 'Loan updated' : 'Loan recorded, amount deducted from the account');
+    }
+  });
+}
+ACTIONS.addLoanGiven = () => openLoanGivenForm(); ACTIONS.editLoanGiven = d => openLoanGivenForm({ id: d.id });
+ACTIONS.payLoanGiven = d => {
+  const l = byId(D.loansGiven, d.id); if (!l) return; if (needAccount()) return;
+  const out = liabOutstanding(l);
+  openFormModal({
+    title: 'Record a repayment', size: 'md', values: { date: today(), amount: out, accountId: singleAcc() },
+    note: `<p class="text-muted2 small">${esc(l.person)} still owes ${fmt(out, l.currency)}. The amount is added back to the account you choose here. It is not counted as income.</p>`,
+    fields: [
+      { name: 'date', label: 'Repayment date', type: 'date', required: true, col: 6 },
+      { name: 'accountId', label: 'Received into', type: 'select', options: accountOptions(''), placeholder: 'Select account…', required: true, col: 6 },
+      { name: 'amount', label: `Amount repaid (${l.currency})`, type: 'number', required: true, min: 0.01, col: 6 },
+      { name: 'description', label: 'Note', col: 6 }
+    ],
+    onSubmit: async vals => {
+      if (vals.amount > out + 0.005) throw new Error(`This is more than the outstanding ${fmt(out, l.currency)}.`);
+      const acc = acct(vals.accountId);
+      const p = { id: uid(), date: vals.date, amount: round2(vals.amount), accountId: acc.id, accountAmount: Eng.convert(vals.amount, l.currency, acc.currency), description: vals.description || '' };
+      const nl = { ...l, payments: [...(l.payments || []), p] }, eo = effectOps(effectsOf('loansGiven', l), effectsOf('loansGiven', nl));
+      await commit([{ op: 'update', col: 'loansGiven', id: l.id, data: { payments: nl.payments } }, ...eo.ops], { checks: eo.checks }); toast('Repayment recorded');
+    }
+  });
+};
+ACTIONS.loanGivenHistory = d => {
+  const l = byId(D.loansGiven, d.id); if (!l) return;
+  const rows = (l.payments || []).slice().sort((a, b) => a.date < b.date ? 1 : -1);
+  const { el } = modalShell(`Repayments – ${esc(l.person)}`, `<div class="modal-body">${rows.length ? `<table class="table tbl"><thead><tr><th>Date</th><th>Received into</th><th class="amt">Amount</th><th></th></tr></thead><tbody>${rows.map(p => `<tr><td>${fdate(p.date)}</td><td>${esc(acctName(p.accountId))}</td><td class="amt">${fmt(p.amount, l.currency)}</td><td class="text-end"><button class="btn btn-sm btn-soft" data-delpay="${p.id}">Delete</button></td></tr>`).join('')}</tbody></table>` : '<p class="text-muted2 mb-0">No repayments yet.</p>'}</div>`);
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('[data-delpay]'); if (!b) return;
+    if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Sure?'; b.classList.replace('btn-soft', 'btn-danger'); setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = 'Delete'; b.classList.replace('btn-danger', 'btn-soft'); } }, 3000); return; }
+    try { const nl = { ...l, payments: (l.payments || []).filter(p => p.id !== b.dataset.delpay) }, eo = effectOps(effectsOf('loansGiven', l), effectsOf('loansGiven', nl)); await commit([{ op: 'update', col: 'loansGiven', id: l.id, data: { payments: nl.payments } }, ...eo.ops], { checks: eo.checks }); bootstrap.Modal.getInstance(el).hide(); toast('Repayment removed'); } catch (err) { toast(err.message, 'danger'); }
+  });
+};
+ACTIONS.delLoanGiven = async d => {
+  const l = byId(D.loansGiven, d.id); if (!l) return;
+  if (!await confirmDlg(`Delete the loan to <b>${esc(l.person)}</b>? Money given or repaid through it is reversed in your accounts.`, { danger: true, ok: 'Delete', title: 'Delete loan' })) return;
+  try { const eo = effectOps(effectsOf('loansGiven', l), []); await commit([{ op: 'delete', col: 'loansGiven', id: l.id }, ...eo.ops], { checks: eo.checks }); toast('Loan deleted'); } catch (e) { toast(e.message, 'danger'); }
 };
 
 /* ---------- RECEIVABLES & PAYABLES ---------- */
@@ -1357,6 +1441,7 @@ function collectAlerts() {
   if (n.due) {
     const rcv = D.receivables.filter(r => dueStatus(r) === 'Overdue'); if (rcv.length) out.push({ tone: 'warn', icon: 'inbox', text: `${rcv.length} overdue receivable${rcv.length > 1 ? 's' : ''}, ${bdt(rcv.reduce((s, r) => s + Eng.toBDT(r.amount - paidOf(r), r.currency), 0))} to collect.`, href: '#/receivables' });
     const pay = D.payables.filter(r => { const s = dueStatus(r); return s === 'Overdue' || (s !== 'Paid' && r.dueDate && r.dueDate <= addDays(t, 7)); }); if (pay.length) out.push({ tone: pay.some(r => dueStatus(r) === 'Overdue') ? 'bad' : 'warn', icon: 'send', text: `${pay.length} payable${pay.length > 1 ? 's are' : ' is'} overdue or due within 7 days, ${bdt(pay.reduce((s, r) => s + Eng.toBDT(r.amount - paidOf(r), r.currency), 0))} in total.`, href: '#/payables' });
+    const lentOver = D.loansGiven.filter(l => loanDueStatus(l) === 'Overdue'); if (lentOver.length) out.push({ tone: 'warn', icon: 'cash-coin', text: `${lentOver.length} loan${lentOver.length > 1 ? 's' : ''} you gave ${lentOver.length > 1 ? 'are' : 'is'} overdue for repayment, ${bdt(lentOver.reduce((s, l) => s + Eng.toBDT(liabOutstanding(l), l.currency), 0))} outstanding.`, href: '#/loans' });
     D.recurringTransactions.filter(r => r.active !== false && r.nextDue && !r.autoCreate && r.nextDue <= addDays(t, +r.reminderDays || 0)).forEach(r => out.push({ tone: r.nextDue < t ? 'bad' : 'warn', icon: 'arrow-repeat', text: `${r.name} ${r.nextDue < t ? 'was due' : 'is due'} on ${fdate(r.nextDue)}.`, href: '#/recurring' }));
   }
   return out;
@@ -1394,7 +1479,7 @@ function renderDashboard(root) {
   const alerts = collectAlerts();
   const demoBtn = State.mode === 'demo' ? btn('loadSample', 'Load sample data', 'magic', 'btn-soft') : '';
   const head = pageHead('Dashboard', `Your money at a glance. Showing <b>${esc(range.label)}</b> (${fdate(range.from)} – ${fdate(range.to)}).`, `${periodControls('dash')}`);
-  const quick = `<div class="d-flex flex-wrap gap-2 mb-3">${btn('addIncome', 'Add Income', 'plus-lg', 'btn-inc')}${btn('addExpense', 'Add Expense', 'plus-lg', 'btn-exp')}${btn('addTransfer', 'Transfer Money', 'arrow-left-right', 'btn-primary')}${btn('addAsset', 'Add Asset', 'gem', 'btn-soft')}${btn('addAccount', 'Add Account', 'wallet2', 'btn-soft')}${btn('addLiability', 'Add Liability', 'credit-card-2-front', 'btn-soft')}</div>`;
+  const quick = `<div class="d-flex flex-wrap gap-2 mb-3">${btn('addIncome', 'Add Income', 'plus-lg', 'btn-inc')}${btn('addExpense', 'Add Expense', 'plus-lg', 'btn-exp')}${btn('addTransfer', 'Transfer Money', 'arrow-left-right', 'btn-primary')}${btn('addAsset', 'Add Asset', 'gem', 'btn-soft')}${btn('addAccount', 'Add Account', 'wallet2', 'btn-soft')}${btn('addLiability', 'Add Liability', 'credit-card-2-front', 'btn-soft')}${btn('addLoanGiven', 'Give a Loan', 'cash-coin', 'btn-soft')}</div>`;
   if (!D.accounts.length) {
     root.innerHTML = head + `<div class="card"><div class="card-b">${emptyBox('wallet2', 'Start with your first account', 'Add where your money lives right now: cash, a bank account, bKash, Wise. Everything else is calculated from there.', `<div class="d-flex gap-2 justify-content-center flex-wrap">${btn('addAccount', 'Add account', 'plus-lg')}${demoBtn}</div>`)}</div></div>`; return;
   }
@@ -1552,6 +1637,21 @@ function renderLiabilities(root) {
   <div class="card">${list.length ? `<div class="table-responsive"><table class="table tbl rcards"><thead><tr><th>Liability</th><th class="amt">Original</th><th class="amt">Outstanding</th><th>Due</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="card-b">${emptyBox('credit-card-2-front', 'No liabilities', 'Add loans, credit card balances or money you borrowed.', btn('addLiability', 'Add liability', 'plus-lg'))}</div>`}</div>`;
 }
 
+/* ---------- LOANS GIVEN ---------- */
+function renderLoansGiven(root) {
+  const list = D.loansGiven.slice().sort((a, b) => (a.dueDate || '9') < (b.dueDate || '9') ? -1 : 1);
+  const total = list.reduce((n, l) => n + Eng.toBDT(liabOutstanding(l), l.currency), 0), orig = list.reduce((n, l) => n + Eng.toBDT(l.originalAmount, l.currency), 0);
+  const openCount = list.filter(l => liabOutstanding(l) > 0).length;
+  const next = list.filter(l => liabOutstanding(l) > 0 && l.dueDate).sort((a, b) => a.dueDate < b.dueDate ? -1 : 1)[0];
+  const rows = list.map(l => {
+    const out = liabOutstanding(l), repaid = l.originalAmount > 0 ? Math.min(100, (1 - out / l.originalAmount) * 100) : 0, st = loanDueStatus(l);
+    return `<tr><td data-label="Person"><div class="fw-semibold">${esc(l.person)}</div><div class="sub">${esc(l.description || '')}</div></td><td data-label="Given" class="amt">${fmt(l.originalAmount, l.currency)}</td><td data-label="Outstanding" class="amt text-inc">${fmt(out, l.currency)}${l.currency !== 'BDT' ? `<div class="sub fw-normal">${bdt(Eng.toBDT(out, l.currency))}</div>` : ''}<div class="progress mt-1" style="height:6px"><div class="progress-bar bg-success" style="width:${repaid}%"></div></div></td><td data-label="Due">${l.dueDate ? fdate(l.dueDate) : ''}</td><td data-label="Status">${statusPill(st)}</td><td class="actions text-end text-nowrap" data-label="">${out > 0 ? `<button class="btn btn-sm btn-primary me-1" data-act="payLoanGiven" data-id="${l.id}">Receive</button>` : ''}${ib('loanGivenHistory', 'clock-history', 'Repayment history', { id: l.id })}${ib('editLoanGiven', 'pencil', 'Edit', { id: l.id })}${ib('delLoanGiven', 'trash', 'Delete', { id: l.id }, 'btn-soft text-danger')}</td></tr>`;
+  }).join('');
+  root.innerHTML = pageHead('Loans given', 'Money you lent from your own accounts. It is deducted right away and is not an expense; repayments are added back to the account you choose and are never counted as income.', btn('addLoanGiven', 'Give a Loan', 'plus-lg')) + `
+  <div class="row g-3 mb-3">${stat('Still to collect', bdt(total), `${openCount} open loan${openCount === 1 ? '' : 's'}`, '#0f9fb0')}${stat('Total given out', bdt(orig), 'Across all loans', 'var(--brand)')}${stat('Repaid so far', bdt(Math.max(0, orig - total)), 'Given minus outstanding', 'var(--inc)')}${stat('Next expected', next ? fdate(next.dueDate) : '–', next ? esc(next.person) : 'No due dates set', 'var(--trf)')}</div>
+  <div class="card">${list.length ? `<div class="table-responsive"><table class="table tbl rcards"><thead><tr><th>Person</th><th class="amt">Given</th><th class="amt">Outstanding</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="card-b">${emptyBox('cash-coin', 'No loans given', 'Record money you lend to someone. It is deducted from the account right away and is never treated as an expense.', btn('addLoanGiven', 'Give a loan', 'plus-lg'))}</div>`}</div>`;
+}
+
 /* ---------- RECEIVABLES / PAYABLES ---------- */
 function renderDues(root, kind) {
   const isR = kind === 'receivables', view = UI.dueView[kind], list = D[kind].slice().sort((a, b) => (a.dueDate || '9') < (b.dueDate || '9') ? -1 : 1), t = today();
@@ -1600,12 +1700,13 @@ function renderNetWorth(root) {
   const assetsBy = sumBy(D.assets.filter(a => a.status !== 'sold').map(a => ({ bdt: Eng.toBDT(a.currentValue * a.quantity, a.currency), c: a.category })), e => e.c);
   const liabBy = sumBy(D.liabilities.map(l => ({ bdt: Eng.toBDT(liabOutstanding(l), l.currency), c: l.type })).filter(x => x.bdt > 0), e => e.c);
   const accs = D.accounts.map(a => ({ n: a.name, v: Eng.toBDT(a.currentBalance, a.currency) })).sort((a, b) => b.v - a.v);
+  const lentBy = sumBy(D.loansGiven.map(l => ({ bdt: Eng.toBDT(liabOutstanding(l), l.currency), c: l.person })).filter(x => x.bdt > 0), e => e.c);
   const list = (rows, cls = '') => rows.length ? rows.map(r => `<div class="d-flex justify-content-between py-1 border-bottom"><span>${esc(r.n ?? r.key)}</span><b class="num ${cls}">${bdt(r.v ?? r.total)}</b></div>`).join('') : '<div class="text-muted2 small">Nothing recorded.</div>';
   root.innerHTML = pageHead('Net worth', 'Total assets + money in accounts − liabilities. Transfers between your own accounts never change it.', `<a class="btn btn-soft" href="#/reports/networth"><i class="bi bi-file-earmark-bar-graph me-1"></i>Net worth report</a>`) + `
   <div class="row g-3 mb-3"><div class="col-12 col-xl-4"><div class="card stat hero h-100" style="--stat:#f2bb5a"><div class="lbl">Your net worth today</div><div class="val num" style="font-size:2.3rem">${bdt(cur.net)}</div><div class="sub"><span class="${d >= 0 ? 'up' : 'down'}"><i class="bi bi-caret-${d >= 0 ? 'up' : 'down'}-fill"></i> ${bdt(Math.abs(d))}</span> since ${fdate(from)}</div></div></div>
-  ${stat('Cash and bank', bdt(cur.cash), `${D.accounts.length} accounts`, 'var(--brand)').replace('col-6 col-xl-3', 'col-6 col-xl-2')}${stat('Assets', bdt(cur.assets), 'Current value', 'var(--trf)').replace('col-6 col-xl-3', 'col-6 col-xl-3')}${stat('Liabilities', bdt(cur.liab), 'Outstanding', 'var(--exp)').replace('col-6 col-xl-3', 'col-12 col-xl-3')}</div>
+  ${stat('Cash and bank', bdt(cur.cash), `${D.accounts.length} accounts`, 'var(--brand)').replace('col-6 col-xl-3', 'col-6 col-xl-2')}${stat('Assets', bdt(cur.assets), 'Current value', 'var(--trf)').replace('col-6 col-xl-3', 'col-6 col-xl-2')}${stat('Lent out', bdt(cur.lent), 'To be repaid', '#0f9fb0').replace('col-6 col-xl-3', 'col-6 col-xl-2')}${stat('Liabilities', bdt(cur.liab), 'Outstanding', 'var(--exp)').replace('col-6 col-xl-3', 'col-6 col-xl-2')}</div>
   <div class="card mb-3"><div class="card-h"><h3>Growth</h3><div class="btn-group btn-group-sm">${['1M', '3M', '6M', '1Y', 'All'].map(k => `<button class="btn ${rng === k ? 'btn-primary' : 'btn-soft'}" data-act="nwRange" data-r="${k}">${k}</button>`).join('')}</div></div><div class="card-b"><div class="chart-box"><canvas id="cNW2"></canvas></div><p class="small text-muted2 mt-2 mb-0">Cash is rebuilt from your transactions, asset values from their value history and liabilities from repayments, so the past follows what you actually recorded.</p></div></div>
-  <div class="row g-3"><div class="col-md-4"><div class="card h-100"><div class="card-h"><h3>Cash by account</h3></div><div class="card-b">${list(accs)}</div></div></div><div class="col-md-4"><div class="card h-100"><div class="card-h"><h3>Assets by category</h3></div><div class="card-b">${list(assetsBy)}</div></div></div><div class="col-md-4"><div class="card h-100"><div class="card-h"><h3>Liabilities by type</h3></div><div class="card-b">${list(liabBy, 'text-exp')}</div></div></div></div>`;
+  <div class="row g-3"><div class="col-md-6 col-xl-3"><div class="card h-100"><div class="card-h"><h3>Cash by account</h3></div><div class="card-b">${list(accs)}</div></div></div><div class="col-md-6 col-xl-3"><div class="card h-100"><div class="card-h"><h3>Assets by category</h3></div><div class="card-b">${list(assetsBy)}</div></div></div><div class="col-md-6 col-xl-3"><div class="card h-100"><div class="card-h"><h3>Loans given by person</h3></div><div class="card-b">${list(lentBy)}</div></div></div><div class="col-md-6 col-xl-3"><div class="card h-100"><div class="card-h"><h3>Liabilities by type</h3></div><div class="card-b">${list(liabBy, 'text-exp')}</div></div></div></div>`;
   const gs = growthSeries(from > t ? t : from, t);
   mkChart('cNW2', { type: 'line', data: { labels: gs.labels, datasets: [{ label: 'Net worth', data: gs.values, borderColor: cssVar('--brand'), backgroundColor: cssVar('--brand') + '22', fill: true, tension: .25, pointRadius: gs.values.length > 40 ? 0 : 3 }] }, options: { plugins: { legend: { display: false }, tooltip: moneyTip }, scales: { y: { ticks: { callback: v => compact(v) } } } } });
 }
@@ -1825,6 +1926,8 @@ async function genSample() {
   asset({ name: 'MacBook Air', category: 'Laptop', purchaseDate: addDays(t, -90), purchasePrice: 120000, currentValue: 85000 }, 'demo_bank'); asset({ name: 'Smartphone', category: 'Mobile', purchaseDate: addDays(t, -300), purchasePrice: 45000, currentValue: 38000 }); asset({ name: 'Gold jewellery', category: 'Gold', purchaseDate: addDays(t, -400), purchasePrice: 60000, currentValue: 68000 });
   const loan = { id: 'demo_loan', name: 'Personal loan', type: 'Personal Loan', currency: 'BDT', originalAmount: 100000, startDate: addDays(t, -200), dueDate: addDays(t, 45), party: 'Islami Bank', description: '', adjust: 0, receivedAccountId: '', receivedAccountAmount: 0, payments: [{ id: 'p1', date: addDays(t, -60), amount: 25000, interest: 500, interestBdt: 500, accountId: 'demo_bank', accountAmount: 25500 }, { id: 'p2', date: addDays(t, -30), amount: 25000, interest: 500, interestBdt: 500, accountId: 'demo_bank', accountAmount: 25500 }] };
   ops.push({ op: 'set', col: 'liabilities', id: loan.id, data: loan }, ...effectOps([], effectsOf('liabilities', loan)).ops);
+  const loanGiven = { id: 'demo_loan_given', person: 'Neighbour', currency: 'BDT', originalAmount: 5000, startDate: addDays(t, -40), dueDate: addDays(t, 20), description: 'Emergency help', adjust: 0, givenAccountId: 'demo_cash', givenAccountAmount: 5000, payments: [{ id: 'lg1', date: addDays(t, -10), amount: 2000, accountId: 'demo_cash', accountAmount: 2000, description: '' }] };
+  ops.push({ op: 'set', col: 'loansGiven', id: loanGiven.id, data: loanGiven }, ...effectOps([], effectsOf('loansGiven', loanGiven)).ops);
   ops.push({ op: 'set', col: 'receivables', id: 'demo_rc', data: { person: 'Client A', amount: 225, currency: 'USD', dueDate: addDays(t, 5), description: 'Ad management invoice', payments: [] } }, { op: 'set', col: 'payables', id: 'demo_pb', data: { person: 'Hosting provider', amount: 6000, currency: 'BDT', dueDate: addDays(t, 7), category: 'Hosting', description: 'Annual plan', payments: [] } });
   [['Food', 15000], ['Transport', 5000], ['Entertainment', 4000]].forEach(([c, a]) => ops.push({ op: 'set', col: 'budgets', id: 'demo_b_' + slug(c), data: { category: c, amount: a, alertPct: 80, active: true } }));
   ops.push({ op: 'set', col: 'recurringTransactions', id: 'demo_r1', data: { type: 'expense', name: 'Internet bill', amount: 1500, currency: 'BDT', category: 'Internet', accountId: 'demo_bank', frequency: 'Monthly', startDate: addDays(t, -27), endDate: '', nextDue: addDays(t, 2), autoCreate: false, reminderDays: 3, active: true }, }, { op: 'set', col: 'recurringTransactions', id: 'demo_r2', data: { type: 'income', name: 'Monthly client payment', amount: 520, currency: 'USD', source: 'Google Ads Client', accountId: 'demo_wise', frequency: 'Monthly', startDate: addDays(t, -20), endDate: '', nextDue: addDays(t, 10), autoCreate: false, reminderDays: 3, active: true } });
@@ -1842,7 +1945,7 @@ ACTIONS.resetDemo = async () => {
 const NAV = [
   { t: 'Dashboard', i: 'speedometer2', r: 'dashboard' },
   { g: 'Money', items: [{ t: 'Income', i: 'arrow-down-left-circle', r: 'income' }, { t: 'Expenses', i: 'arrow-up-right-circle', r: 'expenses' }, { t: 'Transfers', i: 'arrow-left-right', r: 'transfers' }, { t: 'Accounts', i: 'wallet2', r: 'accounts' }, { t: 'All transactions', i: 'list-ul', r: 'transactions' }] },
-  { g: 'Wealth', items: [{ t: 'Assets', i: 'gem', r: 'assets' }, { t: 'Liabilities', i: 'credit-card-2-front', r: 'liabilities' }, { t: 'Net worth', i: 'graph-up-arrow', r: 'networth' }] },
+  { g: 'Wealth', items: [{ t: 'Assets', i: 'gem', r: 'assets' }, { t: 'Liabilities', i: 'credit-card-2-front', r: 'liabilities' }, { t: 'Loans Given', i: 'cash-coin', r: 'loans' }, { t: 'Net worth', i: 'graph-up-arrow', r: 'networth' }] },
   { g: 'Planning', items: [{ t: 'Budgets', i: 'pie-chart', r: 'budgets' }, { t: 'Recurring', i: 'arrow-repeat', r: 'recurring' }, { t: 'Receivables', i: 'inbox', r: 'receivables' }, { t: 'Payables', i: 'send', r: 'payables' }] },
   { g: 'Reports', items: [{ t: 'Income report', i: 'file-earmark-bar-graph', r: 'reports/income' }, { t: 'Expense report', i: 'file-earmark-bar-graph', r: 'reports/expense' }, { t: 'Cash flow', i: 'water', r: 'reports/cashflow' }, { t: 'Net worth report', i: 'bank', r: 'reports/networth' }] },
   { g: 'Settings', items: [{ t: 'Categories', i: 'tags', r: 'settings/categories' }, { t: 'Income sources', i: 'cash-coin', r: 'settings/sources' }, { t: 'Currency', i: 'currency-exchange', r: 'settings/currency' }, { t: 'Profile', i: 'person-circle', r: 'settings/profile' }, { t: 'Notifications and data', i: 'sliders', r: 'settings/notifications' }] }
@@ -1855,7 +1958,7 @@ function route() {
   if (!State.ready) return;
   destroyCharts();
   const raw = location.hash.replace(/^#\/?/, '') || 'dashboard', [pathPart, qs] = raw.split('?'), [name, sub] = pathPart.split('/'), query = Object.fromEntries(new URLSearchParams(qs || '')), root = $('#page');
-  const R = { dashboard: () => renderDashboard(root), income: () => renderTxns(root, 'income', query), expenses: () => renderTxns(root, 'expense', query), transfers: () => renderTxns(root, 'transfer', query), transactions: () => renderTxns(root, 'all', query), accounts: () => renderAccounts(root), assets: () => renderAssets(root), liabilities: () => renderLiabilities(root), networth: () => renderNetWorth(root), budgets: () => renderBudgets(root), recurring: () => renderRecurring(root), receivables: () => renderDues(root, 'receivables'), payables: () => renderDues(root, 'payables'), reports: () => renderReport(root, sub || 'income'), settings: () => renderSettings(root, sub || 'profile') };
+  const R = { dashboard: () => renderDashboard(root), income: () => renderTxns(root, 'income', query), expenses: () => renderTxns(root, 'expense', query), transfers: () => renderTxns(root, 'transfer', query), transactions: () => renderTxns(root, 'all', query), accounts: () => renderAccounts(root), assets: () => renderAssets(root), liabilities: () => renderLiabilities(root), loans: () => renderLoansGiven(root), networth: () => renderNetWorth(root), budgets: () => renderBudgets(root), recurring: () => renderRecurring(root), receivables: () => renderDues(root, 'receivables'), payables: () => renderDues(root, 'payables'), reports: () => renderReport(root, sub || 'income'), settings: () => renderSettings(root, sub || 'profile') };
   try { (R[name] || R.dashboard)(); } catch (e) { console.error(e); root.innerHTML = `<div class="alert alert-danger">Something went wrong while drawing this page: ${esc(e.message)}</div>`; }
   if (query.acc) history.replaceState(null, '', '#/' + name);
   const key = name + (sub ? '/' + sub : ''); let title = '';
@@ -1939,12 +2042,12 @@ function wireAuth() {
 }
 async function boot() {
   applyTheme(); buildNav(); wireAuth();
-  const cfg = getFbConfig(); $('#fbState').textContent = cfg ? '' : ''; if (!cfg) $('#fbSetup').open = true;
+  const cfg = getFbConfig(); $('#fbState').textContent = cfg ? 'configured' : 'not configured'; if (!cfg) $('#fbSetup').open = true;
   if (!cfg) return showAuth();
   try { await initFirebase(cfg); FB.A.onAuthStateChanged(FB.auth, u => { if (u) startSession(u); else { if (State.mode !== 'demo') { endSession(); showAuth(); } } }); }
   catch (e) { console.error(e); showAuth(); authAlert('Could not load Firebase: ' + e.message + '. Check your internet connection and config, or try demo mode.'); }
 }
-window.MM = { State, D, Eng, effectsOf, effectOps, buildIncomeSave, buildExpenseSave, buildTransferSave, buildAssetSave, buildLiabilitySave, currentTotals, nw, totalsFor, getRange, prevRange, ledger, Lc, commit, ACTIONS, expectedBalance, budgetStatus, nextOcc, boot, route, dueStatus, liabOutstanding, buildInsights, growthSeries, trendData, seedDefaults };
+window.MM = { State, D, Eng, effectsOf, effectOps, buildIncomeSave, buildExpenseSave, buildTransferSave, buildAssetSave, buildLiabilitySave, buildLoanGivenSave, currentTotals, nw, totalsFor, getRange, prevRange, ledger, Lc, commit, ACTIONS, expectedBalance, budgetStatus, nextOcc, boot, route, dueStatus, loanDueStatus, liabOutstanding, buildInsights, growthSeries, trendData, seedDefaults };
 boot();
 })();
 </script>
