@@ -170,6 +170,27 @@ a{text-decoration:none}
 .modal-body .form-error{white-space:pre-wrap}
 @media print{.app-sidebar,.topbar,.fab,.page-actions{display:none!important}.app-main{margin:0!important}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* ---- Notes & reminders ---- */
+.note-day{margin-bottom:1.1rem}
+.note-day-h{display:flex;justify-content:space-between;align-items:center;gap:.5rem;font-family:var(--display);font-weight:600;font-size:1.02rem;color:var(--ink);padding:.2rem .2rem .45rem;border-bottom:2px solid var(--line);margin-bottom:.6rem}
+.note-card{display:flex;gap:.7rem;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;padding:.75rem .85rem;margin-bottom:.55rem}
+.note-card.pri-important{border-left-color:var(--warn);background:color-mix(in srgb,var(--trf-soft) 45%,var(--surface))}
+.note-card.pri-urgent{border-left-color:var(--exp);background:color-mix(in srgb,var(--exp-soft) 55%,var(--surface))}
+.note-card.is-done{opacity:.6}.note-card.is-done .note-title{text-decoration:line-through}
+.note-check{background:none;border:0;padding:0;font-size:1.3rem;line-height:1;color:var(--muted);cursor:pointer}.note-check:hover{color:var(--inc)}.is-done .note-check{color:var(--inc)}
+.note-main{flex:1;min-width:0}
+.note-top{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem}
+.note-title{font-weight:700;line-height:1.3;word-break:break-word}
+.note-body{white-space:pre-wrap;word-break:break-word;margin-top:.3rem;color:var(--ink);font-size:.93rem}
+.note-meta{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin-top:.45rem}
+.note-tag{font-size:.78rem;font-weight:600;color:var(--brand);background:var(--brand-soft);border-radius:999px;padding:.1rem .55rem;text-decoration:none}
+.note-actions{display:flex;gap:.3rem;flex-shrink:0}
+.note-card mark{background:#ffe38a;color:#161a33;border-radius:3px;padding:0 1px}
+.note-title{color:var(--ink);text-decoration:none}.note-title:hover{color:var(--brand);text-decoration:underline}
+.note-view-body{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:.85rem 1rem;font-size:.97rem}
+.note-ref{border:1px solid var(--line);border-left:4px solid var(--trf);border-radius:10px;padding:.7rem .9rem;background:var(--surface)}
+.note-ref table td{background:transparent}
 </style>
 </head>
 <body>
@@ -254,6 +275,7 @@ a{text-decoration:none}
             <li><a class="dropdown-item" href="#" data-act="addLoanGiven"><i class="bi bi-cash-coin me-2"></i>Give a loan</a></li>
             <li><a class="dropdown-item" href="#" data-act="addSavings"><i class="bi bi-piggy-bank me-2"></i>Add savings / committee</a></li>
             <li><a class="dropdown-item" href="#" data-act="addAccount"><i class="bi bi-wallet2 me-2"></i>Add account</a></li>
+            <li><a class="dropdown-item" href="#" data-act="addNote"><i class="bi bi-journal-text me-2"></i>Add note / reminder</a></li>
           </ul>
         </div>
         <button class="btn btn-soft btn-icon" data-act="toggleTheme" aria-label="Toggle dark mode" title="Light / dark mode"><i class="bi bi-moon-stars" id="themeIcon"></i></button>
@@ -322,7 +344,7 @@ const DEFAULT_EXPENSE_CATS = {
 const DEFAULT_INCOME_CATS = ['Service Income', 'Employment', 'Business Income', 'Passive Income', 'Other Income'];
 const DEFAULT_SOURCES = ['Google Ads Client', 'Website Maintenance', 'Freelancing', 'Consulting', 'Affiliate Income', 'Salary', 'Business', 'Other'];
 const DEFAULT_SETTINGS = { defaultCurrency: 'BDT', rates: { ...DEFAULT_RATES }, weekStart: 6, allowNegative: false, budgetAlertPct: 80, notify: { budget: true, due: true, browser: false }, initialized: false, pinHash: '' };
-const COLS = ['accounts', 'income', 'expenses', 'transfers', 'assets', 'liabilities', 'loansGiven', 'savings', 'receivables', 'payables', 'budgets', 'recurringTransactions', 'categories', 'incomeSources', 'auditLog'];
+const COLS = ['accounts', 'income', 'expenses', 'transfers', 'assets', 'liabilities', 'loansGiven', 'savings', 'receivables', 'payables', 'budgets', 'recurringTransactions', 'categories', 'incomeSources', 'auditLog', 'notes'];
 
 /* =====================================================================
    1. UTILITIES
@@ -1609,6 +1631,8 @@ function collectAlerts() {
     D.recurringTransactions.filter(r => r.active !== false && r.nextDue && !r.autoCreate && r.nextDue <= addDays(t, +r.reminderDays || 0)).forEach(r => out.push({ tone: r.nextDue < t ? 'bad' : 'warn', icon: 'arrow-repeat', text: `${r.name} ${r.nextDue < t ? 'was due' : 'is due'} on ${fdate(r.nextDue)}.`, href: '#/recurring' }));
     D.savings.filter(s => s.maturityDate && savingsBalance(s) > 0 && s.maturityDate <= addDays(t, 7)).forEach(s => out.push({ tone: s.maturityDate < t ? 'bad' : 'warn', icon: 'piggy-bank', text: `${s.name} ${s.maturityDate < t ? 'matured' : 'matures'} on ${fdate(s.maturityDate)}, ${fmt(savingsBalance(s), s.currency)} held.`, href: '#/savings' }));
   }
+  dueNotes().forEach(n => out.push({ tone: 'bad', icon: 'bell-fill', text: `Reminder: ${n.title} (${fRemind(n.remindAt)})`, href: '#/notes' }));
+  D.notes.filter(n => !n.done && n.priority === 'urgent' && !(n.remindAt && n.remindAt <= nowLocal())).slice(0, 3).forEach(n => out.push({ tone: 'warn', icon: 'exclamation-octagon-fill', text: `Urgent note: ${n.title}`, href: '#/notes' }));
   return out;
 }
 function buildInsights(range, key) {
@@ -2167,10 +2191,222 @@ ACTIONS.resetDemo = async () => {
 };
 
 /* =====================================================================
+   11b. NOTES & REMINDERS  (added section: uses its own 'notes' collection and never touches existing records)
+   ===================================================================== */
+const NOTE_PRI = { normal: { l: 'Normal', c: 'muted', i: 'circle', r: 0 }, important: { l: 'Important', c: 'warn', i: 'star-fill', r: 1 }, urgent: { l: 'Urgent', c: 'exp', i: 'exclamation-octagon-fill', r: 2 } };
+UI.notes = { q: '', pri: '', status: 'all', tag: '', from: '', to: '' };
+const localStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const nowLocal = () => localStr(new Date());
+const inMinutes = m => localStr(new Date(Date.now() + m * 60000));
+const fTime = s => { const [h, m] = s.split(':').map(Number); return `${h % 12 || 12}:${pad(m)} ${h < 12 ? 'AM' : 'PM'}`; };
+const fRemind = s => s ? `${fdate(s.slice(0, 10))}, ${fTime(s.slice(11, 16))}` : '';
+function noteDayLabel(d) {
+  const t = today(), base = parseD(d).toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+  return d === t ? 'Today · ' + base : d === addDays(t, -1) ? 'Yesterday · ' + base : d === addDays(t, 1) ? 'Tomorrow · ' + base : base;
+}
+const noteTags = n => Array.isArray(n.tags) ? n.tags : [];
+function noteMatches(n, f) {
+  if (f.status === 'open' && n.done) return false;
+  if (f.status === 'done' && !n.done) return false;
+  if (f.status === 'reminders' && !(n.remindAt && !n.done)) return false;
+  if (f.pri && n.priority !== f.pri) return false;
+  if (f.tag && !noteTags(n).includes(f.tag)) return false;
+  if (f.from && n.date < f.from) return false;
+  if (f.to && n.date > f.to) return false;
+  if (f.q) { const hay = [n.title, n.body, noteTags(n).join(' '), n.date, fdate(n.date), n.refText, refLabelOf(n), REF_KINDS[n.refKind]?.l].join(' ').toLowerCase(); return f.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w)); }
+  return true;
+}
+function hl(text, q) {
+  const s = esc(text); if (!q) return s;
+  const words = q.split(/\s+/).filter(Boolean).map(w => esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); if (!words.length) return s;
+  return s.replace(new RegExp('(' + words.join('|') + ')', 'gi'), '<mark>$1</mark>');
+}
+const dueNotes = () => D.notes.filter(n => !n.done && n.remindAt && n.remindAt <= nowLocal()).sort((a, b) => a.remindAt < b.remindAt ? -1 : 1);
+
+/* ---- optional reference: link a note to an income / expense / transfer / due / loan record ---- */
+const REF_KINDS = { income: { l: 'Income', route: 'income' }, expense: { l: 'Expense', route: 'expenses' }, transfer: { l: 'Transfer', route: 'transfers' }, receivable: { l: 'Receivable (money to collect)', route: 'receivables' }, payable: { l: 'Payable (money to pay)', route: 'payables' }, loan: { l: 'Loan given', route: 'loans' }, liability: { l: 'Liability / debt', route: 'liabilities' } };
+const REF_COL = { income: 'income', expense: 'expenses', transfer: 'transfers', receivable: 'receivables', payable: 'payables', loan: 'loansGiven', liability: 'liabilities' };
+function refNorm(kind, r) {
+  const dueDate = x => x.dueDate || (x.createdAt || '').slice(0, 10) || '';
+  if (kind === 'income') return { id: r.id, date: r.date, cat: r.category || '', label: `${r.source || r.client || 'Income'} · ${fmt(r.amount, r.currency)}`, rows: [['Date', fdate(r.date)], ['Amount', fmt(r.amount, r.currency) + (r.currency !== 'BDT' ? ` (${bdt(r.bdtAmount)})` : '')], ['Category', r.category], ['Source', r.source], ['Client', r.client], ['Account', acctName(r.accountId)], ['Status', r.status], ['Description', r.description]] };
+  if (kind === 'expense') return { id: r.id, date: r.date, cat: r.category || '', label: `${r.vendor || r.category || 'Expense'} · ${fmt(r.amount, r.currency)}`, rows: [['Date', fdate(r.date)], ['Amount', fmt(r.amount, r.currency) + (r.currency !== 'BDT' ? ` (${bdt(r.bdtAmount)})` : '')], ['Category', [r.category, r.subCategory].filter(Boolean).join(' › ')], ['Vendor', r.vendor], ['Account', acctName(r.accountId)], ['Description', r.description]] };
+  if (kind === 'transfer') return { id: r.id, date: r.date, cat: '', label: `${acctName(r.fromId)} → ${acctName(r.toId)} · ${fmt(r.fromAmount, r.fromCurrency)}`, rows: [['Date', fdate(r.date)], ['From', acctName(r.fromId)], ['To', acctName(r.toId)], ['Amount', fmt(r.fromAmount, r.fromCurrency)], ['Fee', +r.fee > 0 ? fmt(r.fee, r.fromCurrency) : ''], ['Description', r.description]] };
+  if (kind === 'receivable' || kind === 'payable') return { id: r.id, date: dueDate(r), cat: r.category || '', label: `${r.person} · ${fmt(r.amount, r.currency)} (${dueStatus(r)})`, rows: [['Person', r.person], ['Amount', fmt(r.amount, r.currency)], ['Paid so far', fmt(paidOf(r), r.currency)], [kind === 'receivable' ? 'Expected date' : 'Due date', r.dueDate ? fdate(r.dueDate) : ''], ['Status', dueStatus(r)], ['Category', r.category], ['Description', r.description]] };
+  if (kind === 'loan') return { id: r.id, date: r.startDate || '', cat: '', label: `${r.person} · ${fmt(r.originalAmount, r.currency)}`, rows: [['Person', r.person], ['Amount given', fmt(r.originalAmount, r.currency)], ['Outstanding', fmt(liabOutstanding(r), r.currency)], ['Start date', r.startDate ? fdate(r.startDate) : ''], ['Due date', r.dueDate ? fdate(r.dueDate) : ''], ['Status', loanDueStatus(r)]] };
+  if (kind === 'liability') return { id: r.id, date: r.startDate || '', cat: '', label: `${r.name} · ${fmt(r.originalAmount, r.currency)}`, rows: [['Name', r.name], ['Lender', r.party], ['Amount', fmt(r.originalAmount, r.currency)], ['Outstanding', fmt(liabOutstanding(r), r.currency)], ['Start date', r.startDate ? fdate(r.startDate) : ''], ['Status', loanDueStatus(r)]] };
+  return null;
+}
+const refItems = kind => (D[REF_COL[kind]] || []).map(r => refNorm(kind, r)).filter(Boolean).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+const refInfo = n => { if (!n.refKind || !n.refId) return null; const r = byId(D[REF_COL[n.refKind]], n.refId); return r ? refNorm(n.refKind, r) : null; };
+const refLabelOf = n => { const i = refInfo(n); return i ? i.label : (n.refLabel || ''); };
+function refGroups(kind, cat) {
+  const by = {}; refItems(kind).filter(i => !cat || i.cat === cat).forEach(i => (by[i.date || 'No date'] = by[i.date || 'No date'] || []).push({ v: i.id, l: i.label + (i.cat ? ' · ' + i.cat : '') }));
+  return Object.keys(by).sort().reverse().map(d => ({ group: d === 'No date' ? d : fdate(d), items: by[d] }));
+}
+const notifEnabled = () => { try { return 'Notification' in window && Notification.permission === 'granted' && localStorage.getItem('mm_note_notif') !== 'off'; } catch (e) { return false; } };
+
+function noteCard(n, q) {
+  const p = NOTE_PRI[n.priority] || NOTE_PRI.normal, now = nowLocal();
+  const rem = n.remindAt ? (n.done ? pill(fRemind(n.remindAt), 'muted') : n.remindAt <= now ? `<span class="pill pill-exp"><i class="bi bi-bell-fill"></i>${esc(fRemind(n.remindAt))}</span>` : `<span class="pill pill-brand"><i class="bi bi-bell"></i>${esc(fRemind(n.remindAt))}</span>`) : '';
+  const rl = refLabelOf(n), refPill = (n.refKind && rl) ? `<a href="#" class="pill pill-trf text-decoration-none" data-act="viewNote" data-id="${n.id}" title="Linked record"><i class="bi bi-link-45deg"></i>${esc(REF_KINDS[n.refKind]?.l.split(' (')[0] || '')}: ${hl(rl, q)}${refInfo(n) ? '' : ' (deleted)'}</a>` : '', refTxt = n.refText ? `<span class="pill pill-muted"><i class="bi bi-bookmark"></i>${hl(n.refText, q)}</span>` : '';
+  const added = n.createdAt ? new Date(n.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+  return `<div class="note-card pri-${n.priority || 'normal'}${n.done ? ' is-done' : ''}">
+    <button class="note-check" data-act="noteToggle" data-id="${n.id}" title="${n.done ? 'Mark as not done' : 'Mark as done'}" aria-label="Toggle done"><i class="bi bi-${n.done ? 'check-circle-fill' : 'circle'}"></i></button>
+    <div class="note-main">
+      <div class="note-top"><a href="#" class="note-title" data-act="viewNote" data-id="${n.id}">${hl(n.title, q)}</a>${n.priority && n.priority !== 'normal' ? `<span class="pill pill-${p.c}"><i class="bi bi-${p.i}"></i>${p.l}</span>` : ''}${rem}</div>
+      ${refPill || refTxt ? `<div class="note-meta mt-1">${refPill}${refTxt}</div>` : ''}
+      ${n.body ? `<div class="note-body">${hl(n.body, q)}</div>` : ''}
+      <div class="note-meta">${noteTags(n).map(t => `<a href="#" class="note-tag" data-act="noteTag" data-tag="${esc(t)}">#${hl(t, q)}</a>`).join('')}${added ? `<span class="text-muted2 small ms-auto">Added ${esc(added)}</span>` : ''}</div>
+    </div>
+    <div class="note-actions"><button class="btn btn-soft btn-icon btn-sm" data-act="viewNote" data-id="${n.id}" title="View" aria-label="View"><i class="bi bi-eye"></i></button><button class="btn btn-soft btn-icon btn-sm" data-act="editNote" data-id="${n.id}" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></button><button class="btn btn-soft btn-icon btn-sm" data-act="delNote" data-id="${n.id}" title="Delete" aria-label="Delete"><i class="bi bi-trash"></i></button></div>
+  </div>`;
+}
+function renderNoteList() {
+  const box = $('#notesList'); if (!box) return;
+  const f = UI.notes, rows = D.notes.filter(n => noteMatches(n, f));
+  if (!D.notes.length) { box.innerHTML = `<div class="card">${emptyBox('journal-text', 'No notes yet', 'Write down what happened today, what to remember, or who owes you money, and set a reminder time if you want a notification.', btn('addNote', 'Add your first note', 'plus-lg'))}</div>`; return; }
+  if (!rows.length) { box.innerHTML = `<div class="card">${emptyBox('search', 'No notes match', 'Try a different word or clear the filters.', btn('noteClear', 'Clear filters', 'x-lg', 'btn-soft'))}</div>`; return; }
+  const groups = {}; rows.forEach(n => (groups[n.date || 'No date'] = groups[n.date || 'No date'] || []).push(n));
+  box.innerHTML = Object.keys(groups).sort().reverse().map(d => {
+    const list = groups[d].sort((a, b) => ((NOTE_PRI[b.priority]?.r || 0) - (NOTE_PRI[a.priority]?.r || 0)) || (b.createdAt || '').localeCompare(a.createdAt || ''));
+    return `<div class="note-day"><div class="note-day-h"><span>${d === 'No date' ? d : esc(noteDayLabel(d))}</span><span class="text-muted2 small">${list.length} note${list.length > 1 ? 's' : ''}</span></div>${list.map(n => noteCard(n, f.q)).join('')}</div>`;
+  }).join('') + `<div class="small text-muted2 text-center mt-2">${rows.length} of ${D.notes.length} notes shown</div>`;
+}
+function renderNotes(root) {
+  const f = UI.notes, t = today(), open = D.notes.filter(n => !n.done), due = dueNotes();
+  const tags = [...new Set(D.notes.flatMap(noteTags))].sort(), upcoming = open.filter(n => n.remindAt && n.remindAt > nowLocal()).length;
+  const canNotify = 'Notification' in window, perm = canNotify ? Notification.permission : 'unsupported';
+  const permBox = perm === 'unsupported' ? '' : perm === 'denied' ? `<div class="alert-strip"><i class="bi bi-bell-slash"></i><span>Browser notifications are blocked for this site. Reminders still show inside the app. To get pop-ups, allow notifications in your browser's site settings.</span></div>` : (perm === 'granted' && notifEnabled()) ? `<div class="alert-strip"><i class="bi bi-bell-fill text-inc"></i><span><b>Browser notifications are on.</b> <span class="text-muted2">Reminders pop up while this app is open in a browser tab.</span></span><span class="ms-auto d-flex gap-1"><button class="btn btn-sm btn-soft" data-act="noteTestNotif">Send test</button><button class="btn btn-sm btn-soft" data-act="noteDisableNotif"><i class="bi bi-bell-slash me-1"></i>Disable</button></span></div>` : `<div class="alert-strip"><i class="bi bi-bell"></i><span>${perm === 'granted' ? 'Browser notifications are turned off in this app.' : 'Turn on browser notifications to get a pop-up at your reminder time. Reminders work while this app is open in a browser tab.'}</span><button class="btn btn-sm btn-primary ms-auto" data-act="noteEnableNotif">Enable</button></div>`;
+  const dueBox = due.map(n => `<div class="alert-strip bad"><i class="bi bi-bell-fill"></i><span><b>${esc(n.title)}</b><span class="text-muted2"> · reminder ${esc(fRemind(n.remindAt))}</span></span><span class="ms-auto d-flex gap-1 flex-wrap"><button class="btn btn-sm btn-soft" data-act="noteSnooze" data-id="${n.id}" data-m="60">Snooze 1h</button><button class="btn btn-sm btn-soft" data-act="noteSnooze" data-id="${n.id}" data-m="tomorrow">Tomorrow 9 AM</button><button class="btn btn-sm btn-primary" data-act="noteToggle" data-id="${n.id}">Done</button></span></div>`).join('');
+  const F = (label, html, col = 'col-6 col-md-3') => `<div class="${col}"><label class="form-label small mb-1">${label}</label>${html}</div>`;
+  const sel = (k, opts) => `<select class="form-select form-select-sm" data-nf="${k}">${opts.map(([v, l]) => `<option value="${esc(v)}"${f[k] === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  root.innerHTML = pageHead('Notes & reminders', 'A dated journal of what happens each day. Mark important notes and set a time to be reminded.', btn('addNote', 'Add note', 'plus-lg')) + permBox + dueBox + `
+  <div class="row g-3 mb-3">${stat('Open notes', open.length, `${D.notes.length} in total`, 'var(--brand)')}${stat('Urgent / important', open.filter(n => n.priority === 'urgent' || n.priority === 'important').length, 'Still open', 'var(--exp)')}${stat('Reminders coming', upcoming, due.length ? `${due.length} due now` : 'Scheduled', 'var(--trf)')}${stat('Notes today', D.notes.filter(n => n.date === t).length, fdate(t), 'var(--inc)')}</div>
+  <div class="card mb-3"><div class="card-b"><div class="row g-2 align-items-end">
+    ${F('Search notes, topics, tags, dates', `<div class="input-group input-group-sm"><span class="input-group-text"><i class="bi bi-search"></i></span><input type="search" class="form-control" data-nf="q" value="${esc(f.q)}" placeholder="e.g. loan, client name, AC, headache"></div>`, 'col-12 col-md-4')}
+    ${F('Show', sel('status', [['all', 'All notes'], ['open', 'Open only'], ['done', 'Done only'], ['reminders', 'With reminder']]))}
+    ${F('Priority', sel('pri', [['', 'Any'], ['urgent', 'Urgent'], ['important', 'Important'], ['normal', 'Normal']]), 'col-6 col-md-2')}
+    ${F('Tag', sel('tag', [['', 'Any'], ...tags.map(x => [x, '#' + x])]), 'col-6 col-md-3')}
+    ${F('From date', `<input type="date" class="form-control form-control-sm" data-nf="from" value="${esc(f.from)}">`, 'col-6 col-md-3')}
+    ${F('To date', `<input type="date" class="form-control form-control-sm" data-nf="to" value="${esc(f.to)}">`, 'col-6 col-md-3')}
+    <div class="col-12 col-md-auto ms-md-auto">${btn('noteClear', 'Clear filters', 'x-lg', 'btn-soft btn-sm')}</div>
+  </div></div></div>
+  <div id="notesList"></div>`;
+  renderNoteList();
+}
+document.addEventListener('input', e => { const t = e.target.closest('[data-nf]'); if (t && t.tagName === 'INPUT' && t.type === 'search') { UI.notes[t.dataset.nf] = t.value.trim(); noteListDebounced(); } });
+document.addEventListener('change', e => { const t = e.target.closest('[data-nf]'); if (t && !(t.tagName === 'INPUT' && t.type === 'search')) { UI.notes[t.dataset.nf] = t.value; renderNoteList(); } });
+const noteListDebounced = debounce(renderNoteList, 150);
+ACTIONS.noteClear = () => { UI.notes = { q: '', pri: '', status: 'all', tag: '', from: '', to: '' }; refreshHook(); };
+ACTIONS.noteTag = d => { UI.notes.tag = d.tag; refreshHook(); };
+ACTIONS.noteEnableNotif = async () => {
+  try { const r = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission(); if (r === 'granted') { try { localStorage.setItem('mm_note_notif', 'on'); } catch (e) { } toast('Browser notifications are on.'); } else toast('Notifications were not allowed.', 'warning'); } catch (e) { toast(e.message, 'danger'); }
+  refreshHook();
+};
+ACTIONS.noteDisableNotif = () => { try { localStorage.setItem('mm_note_notif', 'off'); } catch (e) { } toast('Browser notifications are turned off. Reminders still show inside the app.', 'warning'); refreshHook(); };
+ACTIONS.noteTestNotif = () => { try { new Notification('Money Manager', { body: 'Test notification. Your reminders will look like this.' }); } catch (e) { toast('Could not show a notification: ' + e.message, 'danger'); } };
+
+function openNoteForm(id) {
+  const ex = id ? byId(D.notes, id) : null;
+  const v = ex ? { ...ex, tags: noteTags(ex).join(', ') } : { date: today(), priority: 'normal' };
+  const fields = [
+    { name: 'title', label: 'Title', required: true, placeholder: 'e.g. Rahim to return my money', col: 8 },
+    { name: 'date', label: 'Note date', type: 'date', required: true, col: 4 },
+    { name: 'body', label: 'Details', type: 'textarea', rows: 6, placeholder: 'What happened, what to do, symptoms, issue, amount, person…' },
+    { name: 'priority', label: 'Priority', type: 'select', options: Object.entries(NOTE_PRI).map(([k, o]) => ({ v: k, l: o.l })), col: 4 },
+    { name: 'tags', label: 'Tags / topics', placeholder: 'loan, client, ads, health', col: 8, help: 'Separate with commas. You can search and filter by these later.' },
+    { name: 'refKind', label: 'Linked to (optional)', type: 'select', placeholder: 'No reference', options: Object.entries(REF_KINDS).map(([k, o]) => ({ v: k, l: o.l })), col: 4 },
+    { name: 'refCat', label: 'Category (filter)', type: 'select', placeholder: 'All categories', options: [], col: 4 },
+    { name: 'refId', label: 'Record (grouped by day)', type: 'select', placeholder: 'Select record…', options: [], col: 4 },
+    { name: 'refText', label: 'Other reference (optional)', placeholder: 'e.g. Upwork order #123, client name, invoice no.', col: 12 },
+    { name: 'remindAt', label: 'Remind me at (optional)', type: 'datetime-local', col: 6, help: 'Leave empty if you do not need a notification.' },
+    { name: 'done', label: 'Mark as done', type: 'checkbox', col: 6 }
+  ];
+  openFormModal({
+    title: ex ? 'Edit note' : 'Add note', fields, values: v,
+    onOpen: form => {
+      const K = form.elements.refKind, C = form.elements.refCat, I = form.elements.refId, wrap = n => form.querySelector(`[data-wrap="${n}"]`);
+      const fill = (keepCat, keepId) => {
+        const kind = K.value, on = !!kind;
+        wrap('refCat').classList.toggle('d-none', !on); wrap('refId').classList.toggle('d-none', !on);
+        const cats = on ? [...new Set(refItems(kind).map(i => i.cat).filter(Boolean))].sort() : [];
+        C.innerHTML = '<option value="">All categories</option>' + optHTML(cats, keepCat); wrap('refCat').classList.toggle('d-none', !cats.length);
+        I.innerHTML = '<option value="">Select record…</option>' + optHTML(refGroups(kind, C.value), keepId);
+      };
+      K.addEventListener('change', () => fill('', '')); C.addEventListener('change', () => fill(C.value, ''));
+      fill('', ex?.refId || '');
+    },
+    onSubmit: async vals => {
+      if (vals.refKind && !vals.refId) throw new Error('Select the record this note is linked to, or set "Linked to" back to "No reference".');
+      const changedRemind = (vals.remindAt || '') !== (ex?.remindAt || '');
+      if (vals.remindAt && changedRemind && vals.remindAt <= nowLocal()) throw new Error('Choose a reminder time in the future.');
+      const tags = [...new Set(String(vals.tags || '').split(/[,،#]+/).map(s => s.trim()).filter(Boolean))];
+      const rec = { ...(ex || {}), id: ex?.id || uid(), title: vals.title, date: vals.date, body: vals.body || '', priority: vals.priority || 'normal', tags, refKind: vals.refKind || '', refId: vals.refKind ? vals.refId : '', refLabel: '', refText: vals.refText || '', remindAt: vals.remindAt || '', remindedAt: changedRemind ? '' : (ex?.remindedAt || ''), done: !!vals.done, doneAt: vals.done ? (ex?.doneAt || new Date().toISOString()) : '' };
+      if (rec.refKind) { const ri = refInfo(rec); rec.refLabel = ri ? ri.label : ''; }
+      await commit([{ op: 'set', col: 'notes', id: rec.id, data: rec }]); toast('Note saved');
+    }
+  });
+}
+ACTIONS.addNote = () => openNoteForm(); ACTIONS.editNote = d => openNoteForm(d.id);
+ACTIONS.delNote = async d => { if (await confirmDlg('Delete this note? This cannot be undone.', { danger: true, ok: 'Delete', title: 'Delete note' })) { await commit([{ op: 'delete', col: 'notes', id: d.id }]); toast('Note deleted'); } };
+ACTIONS.noteToggle = async d => { const n = byId(D.notes, d.id); if (!n) return; const done = !n.done; await commit([{ op: 'update', col: 'notes', id: n.id, data: { done, doneAt: done ? new Date().toISOString() : '' } }]); };
+ACTIONS.noteSnooze = async d => {
+  const n = byId(D.notes, d.id); if (!n) return;
+  const at = d.m === 'tomorrow' ? addDays(today(), 1) + 'T09:00' : inMinutes(+d.m || 60);
+  await commit([{ op: 'update', col: 'notes', id: n.id, data: { remindAt: at, remindedAt: '' } }]); toast('Reminder moved to ' + fRemind(at));
+};
+
+/* ---- view a note in full ---- */
+const closeModals = () => new Promise(res => { const el = $('#modalHost .modal.show'); if (!el) return res(); el.addEventListener('hidden.bs.modal', () => res(), { once: true }); try { bootstrap.Modal.getInstance(el).hide(); } catch (e) { res(); } });
+function openNoteView(id) {
+  const n = byId(D.notes, id); if (!n) return;
+  const p = NOTE_PRI[n.priority] || NOTE_PRI.normal, info = refInfo(n), kindL = REF_KINDS[n.refKind]?.l;
+  const refBlock = n.refKind ? `<div class="note-ref"><div class="small fw-bold text-muted2 mb-1"><i class="bi bi-link-45deg"></i> Linked ${esc((kindL || '').split(' (')[0].toLowerCase())}</div>${info ? `<table class="table table-sm mb-2"><tbody>${info.rows.filter(r => r[1]).map(r => `<tr><td class="text-muted2" style="width:38%">${esc(r[0])}</td><td class="fw-semibold">${esc(r[1])}</td></tr>`).join('')}</tbody></table><button class="btn btn-sm btn-soft" data-act="closeNoteView" data-route="${REF_KINDS[n.refKind].route}"><i class="bi bi-box-arrow-up-right me-1"></i>Open ${esc(kindL.split(' (')[0])} page</button>` : `<div class="text-muted2 small">This record was deleted. It was: ${esc(n.refLabel || 'unknown')}</div>`}</div>` : '';
+  const rem = n.remindAt ? `<div class="mb-2"><i class="bi bi-bell me-1"></i><b>Reminder:</b> ${esc(fRemind(n.remindAt))} ${n.done ? '' : n.remindAt <= nowLocal() ? pill('Due', 'exp') : pill('Scheduled', 'brand')}</div>` : '';
+  const when = iso => iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const body = `<div class="modal-body">
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3"><span class="pill pill-${p.c}"><i class="bi bi-${p.i}"></i>${p.l}</span>${n.done ? pill('Done', 'inc') : pill('Open', 'brand')}<span class="text-muted2"><i class="bi bi-calendar3 me-1"></i>${esc(n.date ? noteDayLabel(n.date) : 'No date')}</span></div>
+    ${rem}${n.refText ? `<div class="mb-2"><i class="bi bi-bookmark me-1"></i><b>Reference:</b> ${esc(n.refText)}</div>` : ''}
+    ${refBlock ? `<div class="mb-3">${refBlock}</div>` : ''}
+    <div class="note-view-body">${n.body ? esc(n.body) : '<span class="text-muted2">No details written.</span>'}</div>
+    ${noteTags(n).length ? `<div class="note-meta mt-3">${noteTags(n).map(t => `<span class="note-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
+    <div class="small text-muted2 mt-3">Added ${esc(when(n.createdAt))}${n.updatedAt && n.updatedAt !== n.createdAt ? ` · Updated ${esc(when(n.updatedAt))}` : ''}</div>
+  </div><div class="modal-footer"><button class="btn btn-soft me-auto" data-bs-dismiss="modal">Close</button><button class="btn btn-soft text-danger" data-act="noteViewDelete" data-id="${n.id}"><i class="bi bi-trash me-1"></i>Delete</button><button class="btn btn-soft" data-act="noteViewToggle" data-id="${n.id}"><i class="bi bi-check2-circle me-1"></i>${n.done ? 'Mark not done' : 'Mark done'}</button><button class="btn btn-primary" data-act="noteViewEdit" data-id="${n.id}"><i class="bi bi-pencil me-1"></i>Edit</button></div>`;
+  modalShell(esc(n.title), body, { size: 'lg' });
+}
+ACTIONS.viewNote = d => openNoteView(d.id);
+ACTIONS.closeNoteView = async d => { await closeModals(); if (d.route) location.hash = '#/' + d.route; };
+ACTIONS.noteViewEdit = async d => { await closeModals(); openNoteForm(d.id); };
+ACTIONS.noteViewDelete = async d => { await closeModals(); ACTIONS.delNote(d); };
+ACTIONS.noteViewToggle = async d => { await closeModals(); await ACTIONS.noteToggle(d); };
+
+/* ---- reminder engine: checks every 15 s while the app is open ---- */
+const noteFired = new Set();
+function notifyNote(n, late) {
+  const msg = (late ? 'Missed reminder: ' : 'Reminder: ') + n.title;
+  try {
+    const el = document.createElement('div'); el.className = 'toast align-items-center text-bg-warning border-0'; el.setAttribute('role', 'alert');
+    el.innerHTML = `<div class="d-flex"><div class="toast-body"><i class="bi bi-bell-fill me-1"></i>${esc(msg)}<div class="small"><a href="#/notes" class="text-reset text-decoration-underline">Open notes</a></div></div><button class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+    $('#toasts').appendChild(el); const t = new bootstrap.Toast(el, { delay: 30000 }); el.addEventListener('hidden.bs.toast', () => el.remove()); t.show();
+  } catch (e) { }
+  try { if (notifEnabled()) new Notification(msg, { body: (n.body || '').slice(0, 140), tag: 'note_' + n.id }); } catch (e) { }
+}
+async function checkNoteReminders() {
+  if (!State.ready || !State.user) return;
+  const now = nowLocal(), cutoff = inMinutes(-3);
+  for (const n of D.notes.filter(x => !x.done && x.remindAt && !x.remindedAt && x.remindAt <= now && !noteFired.has(x.id + '|' + x.remindAt))) {
+    noteFired.add(n.id + '|' + n.remindAt); notifyNote(n, n.remindAt < cutoff);
+    try { await commit([{ op: 'update', col: 'notes', id: n.id, data: { remindedAt: new Date().toISOString() } }]); } catch (e) { console.error(e); }
+  }
+}
+setInterval(checkNoteReminders, 15000);
+
+/* =====================================================================
    12. AUTH, SESSION, ROUTER, BOOT
    ===================================================================== */
 const NAV = [
   { t: 'Dashboard', i: 'speedometer2', r: 'dashboard' },
+  { t: 'Notes & reminders', i: 'journal-text', r: 'notes' },
   { g: 'Money', items: [{ t: 'Income', i: 'arrow-down-left-circle', r: 'income' }, { t: 'Expenses', i: 'arrow-up-right-circle', r: 'expenses' }, { t: 'Transfers', i: 'arrow-left-right', r: 'transfers' }, { t: 'Accounts', i: 'wallet2', r: 'accounts' }, { t: 'All transactions', i: 'list-ul', r: 'transactions' }] },
   { g: 'Wealth', items: [{ t: 'Assets', i: 'gem', r: 'assets' }, { t: 'Liabilities', i: 'credit-card-2-front', r: 'liabilities' }, { t: 'Loans Given', i: 'cash-coin', r: 'loans' }, { t: 'Savings & Committees', i: 'piggy-bank', r: 'savings' }, { t: 'Net worth', i: 'graph-up-arrow', r: 'networth' }] },
   { g: 'Planning', items: [{ t: 'Budgets', i: 'pie-chart', r: 'budgets' }, { t: 'Recurring', i: 'arrow-repeat', r: 'recurring' }, { t: 'Receivables', i: 'inbox', r: 'receivables' }, { t: 'Payables', i: 'send', r: 'payables' }] },
@@ -2185,7 +2421,7 @@ function route() {
   if (!State.ready) return;
   destroyCharts();
   const raw = location.hash.replace(/^#\/?/, '') || 'dashboard', [pathPart, qs] = raw.split('?'), [name, sub] = pathPart.split('/'), query = Object.fromEntries(new URLSearchParams(qs || '')), root = $('#page');
-  const R = { dashboard: () => renderDashboard(root), income: () => renderTxns(root, 'income', query), expenses: () => renderTxns(root, 'expense', query), transfers: () => renderTxns(root, 'transfer', query), transactions: () => renderTxns(root, 'all', query), accounts: () => renderAccounts(root), assets: () => renderAssets(root), liabilities: () => renderLiabilities(root), loans: () => renderLoansGiven(root), savings: () => renderSavings(root), networth: () => renderNetWorth(root), asof: () => renderAsOf(root), budgets: () => renderBudgets(root), recurring: () => renderRecurring(root), receivables: () => renderDues(root, 'receivables'), payables: () => renderDues(root, 'payables'), reports: () => renderReport(root, sub || 'income'), settings: () => renderSettings(root, sub || 'profile') };
+  const R = { dashboard: () => renderDashboard(root), income: () => renderTxns(root, 'income', query), expenses: () => renderTxns(root, 'expense', query), transfers: () => renderTxns(root, 'transfer', query), transactions: () => renderTxns(root, 'all', query), accounts: () => renderAccounts(root), assets: () => renderAssets(root), liabilities: () => renderLiabilities(root), loans: () => renderLoansGiven(root), savings: () => renderSavings(root), networth: () => renderNetWorth(root), asof: () => renderAsOf(root), budgets: () => renderBudgets(root), recurring: () => renderRecurring(root), notes: () => renderNotes(root), receivables: () => renderDues(root, 'receivables'), payables: () => renderDues(root, 'payables'), reports: () => renderReport(root, sub || 'income'), settings: () => renderSettings(root, sub || 'profile') };
   try { (R[name] || R.dashboard)(); } catch (e) { console.error(e); root.innerHTML = `<div class="alert alert-danger">Something went wrong while drawing this page: ${esc(e.message)}</div>`; }
   if (query.acc) history.replaceState(null, '', '#/' + name);
   const key = name + (sub ? '/' + sub : ''); let title = '';
@@ -2243,6 +2479,7 @@ async function onReady() {
   try { await seedDefaults(); } catch (e) { console.error(e); toast('Could not create default categories: ' + e.message, 'danger'); }
   route();
   try { await processRecurring(); } catch (e) { console.error(e); }
+  checkNoteReminders();
   if (State.settings.notify.browser && 'Notification' in window && Notification.permission === 'granted') collectAlerts().slice(0, 3).forEach(a => new Notification('Money Manager', { body: a.text }));
 }
 function attachFirebase(user) {
