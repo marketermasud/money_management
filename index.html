@@ -2,7 +2,15 @@
 <html lang="en" data-bs-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#12163a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Money Manager">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Money Manager – Personal Finance &amp; Net Worth</title>
 <script>
 /* Apply saved theme before paint (no flash) */
@@ -171,6 +179,74 @@ a{text-decoration:none}
 @media print{.app-sidebar,.topbar,.fab,.page-actions{display:none!important}.app-main{margin:0!important}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 
+/* ---- Mobile app shell ---- */
+html{-webkit-text-size-adjust:100%}
+body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
+.topbar{padding-top:calc(.6rem + env(safe-area-inset-top));padding-left:calc(1.25rem + env(safe-area-inset-left));padding-right:calc(1.25rem + env(safe-area-inset-right))}
+.app-sidebar{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.bottom-nav{display:none}
+.modal-static .modal-dialog{transform:none!important}
+@media(max-width:991.98px){
+  .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:1030;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  .bottom-nav>a,.bottom-nav>button,.bottom-nav .bn-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem;min-height:58px;padding:.35rem .2rem;border:0;background:none;color:var(--muted);font-size:.7rem;font-weight:600;line-height:1.1}
+  .bottom-nav>a i,.bottom-nav>button i,.bn-add i{font-size:1.25rem;line-height:1}
+  .bottom-nav .active{color:var(--brand)}
+  .bottom-nav .bn-add i{width:44px;height:44px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.4rem;box-shadow:0 6px 16px rgba(18,22,58,.3)}
+  [data-bs-theme=dark] .bottom-nav .bn-add i{color:#0e1126}
+  .bn-menu{position:fixed!important;left:50%!important;right:auto!important;top:auto!important;bottom:calc(70px + env(safe-area-inset-bottom))!important;transform:translateX(-50%)!important;min-width:15rem;box-shadow:0 12px 32px rgba(18,22,58,.28)}
+  .bn-menu .dropdown-item{padding:.7rem 1rem;font-size:1rem}
+  .page{padding-bottom:calc(5.5rem + env(safe-area-inset-bottom))!important}
+  .toast-container{top:env(safe-area-inset-top)!important;bottom:auto!important;left:0;right:0;align-items:center;display:flex;flex-direction:column}
+}
+@media(max-width:767.98px){
+  .form-control,.form-select,.form-control-sm,.form-select-sm{font-size:16px!important}
+  .form-control,.form-select{min-height:44px}
+  textarea.form-control{min-height:88px}
+  .btn-icon{width:40px;height:40px}
+  .modal-footer .btn{min-height:44px;padding-left:1.1rem;padding-right:1.1rem}
+  .dropdown-menu .dropdown-item{padding-top:.55rem;padding-bottom:.55rem}
+}
+@media(max-width:575.98px){
+  .modal-header{padding-top:calc(1rem + env(safe-area-inset-top))}
+  .modal-footer{padding-bottom:calc(.75rem + env(safe-area-inset-bottom))}
+}
+@media print{.bottom-nav{display:none!important}}
+
+/* ---- Motion ---- */
+@keyframes mmUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes mmPop{from{opacity:0;transform:scale(.94) translateY(6px)}to{opacity:1;transform:none}}
+@keyframes mmGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes mmPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+@keyframes mmToast{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
+.page-in>*{animation:mmUp .42s cubic-bezier(.2,.7,.2,1) backwards}
+.page-in>*:nth-child(2){animation-delay:.05s}.page-in>*:nth-child(3){animation-delay:.1s}.page-in>*:nth-child(4){animation-delay:.15s}.page-in>*:nth-child(n+5){animation-delay:.2s}
+.page-in .row>[class*=col]{animation:mmUp .45s cubic-bezier(.2,.7,.2,1) backwards}
+.page-in .row>[class*=col]:nth-child(1){animation-delay:.06s}.page-in .row>[class*=col]:nth-child(2){animation-delay:.11s}.page-in .row>[class*=col]:nth-child(3){animation-delay:.16s}.page-in .row>[class*=col]:nth-child(4){animation-delay:.21s}.page-in .row>[class*=col]:nth-child(5){animation-delay:.26s}.page-in .row>[class*=col]:nth-child(n+6){animation-delay:.3s}
+.page-in .progress-bar,.page-in .share-bar span{transform-origin:left center;animation:mmGrow .8s cubic-bezier(.2,.7,.2,1) .25s backwards}
+.page-in .txn-item,.page-in .note-card,.page-in .loc-row,.page-in .insight{animation:mmUp .4s ease .2s backwards}
+.card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+@media(hover:hover){.card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(18,22,58,.09)}.sb-link{transition:background .15s,color .15s,padding-left .15s}.sb-link:hover{padding-left:.95rem}}
+.btn{transition:transform .12s ease,background-color .15s,border-color .15s,color .15s,box-shadow .15s,filter .15s}
+.btn:active{transform:scale(.96)}
+.dropdown-menu.show{animation:mmPop .16s ease-out}
+.bn-menu.show{animation:none}
+.toast.show{animation:mmToast .25s ease-out}
+.modal.fade .modal-dialog{transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.modal.fade:not(.show) .modal-dialog{transform:translateY(24px) scale(.98)}
+.bottom-nav>a,.bottom-nav>button{transition:color .15s,transform .12s}
+.bottom-nav>a:active,.bottom-nav>button:active{transform:scale(.92)}
+.bottom-nav>a.active i{animation:mmPulse .35s ease}
+.bottom-nav>a{position:relative}
+.bottom-nav>a::before{content:"";position:absolute;top:0;left:50%;width:0;height:3px;border-radius:0 0 3px 3px;background:var(--brand);transition:width .22s ease,left .22s ease}
+.bottom-nav>a.active::before{width:36px;left:calc(50% - 18px)}
+.bn-add i{transition:transform .2s ease}
+.bn-add[aria-expanded=true] i{transform:rotate(45deg)}
+.app-sidebar.open .sb-link,.app-sidebar.open .sb-group{animation:mmUp .3s ease backwards}
+#splash .spinner-border{animation-duration:.7s}
+#splash>div:last-child{animation:mmUp .5s ease both}
+@media(max-width:575.98px){.modal.fade:not(.show) .modal-dialog{transform:translateY(60px)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important}}
+
 /* ---- Notes & reminders ---- */
 .note-day{margin-bottom:1.1rem}
 .note-day-h{display:flex;justify-content:space-between;align-items:center;gap:.5rem;font-family:var(--display);font-weight:600;font-size:1.02rem;color:var(--ink);padding:.2rem .2rem .45rem;border-bottom:2px solid var(--line);margin-bottom:.6rem}
@@ -293,14 +369,21 @@ a{text-decoration:none}
     <div id="demoBanner" class="demo-banner d-none"><i class="bi bi-exclamation-triangle me-1"></i>Demo mode: everything here is stored only in this browser and is separate from your Firebase data. <a href="#" data-act="logout" class="ms-1">Exit demo</a></div>
     <main id="page" class="page"></main>
   </div>
-  <div class="fab d-lg-none dropup">
-    <button class="btn btn-primary" data-bs-toggle="dropdown" aria-label="Add transaction"><i class="bi bi-plus-lg"></i></button>
-    <ul class="dropdown-menu dropdown-menu-end mb-2">
-      <li><a class="dropdown-item py-2" href="#" data-act="addIncome"><i class="bi bi-arrow-down-left-circle text-inc me-2"></i>Add income</a></li>
-      <li><a class="dropdown-item py-2" href="#" data-act="addExpense"><i class="bi bi-arrow-up-right-circle text-exp me-2"></i>Add expense</a></li>
-      <li><a class="dropdown-item py-2" href="#" data-act="addTransfer"><i class="bi bi-arrow-left-right text-trf me-2"></i>Transfer money</a></li>
-    </ul>
-  </div>
+  <nav class="bottom-nav" aria-label="Quick navigation">
+    <a href="#/dashboard" data-bn="dashboard"><i class="bi bi-speedometer2"></i>Home</a>
+    <a href="#/transactions" data-bn="transactions"><i class="bi bi-list-ul"></i>Transactions</a>
+    <div class="dropup d-flex">
+      <button class="bn-add flex-fill" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Add"><i class="bi bi-plus-lg"></i></button>
+      <ul class="dropdown-menu bn-menu">
+        <li><a class="dropdown-item" href="#" data-act="addIncome"><i class="bi bi-arrow-down-left-circle text-inc me-2"></i>Add income</a></li>
+        <li><a class="dropdown-item" href="#" data-act="addExpense"><i class="bi bi-arrow-up-right-circle text-exp me-2"></i>Add expense</a></li>
+        <li><a class="dropdown-item" href="#" data-act="addTransfer"><i class="bi bi-arrow-left-right text-trf me-2"></i>Transfer money</a></li>
+        <li><a class="dropdown-item" href="#" data-act="addNote"><i class="bi bi-journal-text me-2"></i>Add note / reminder</a></li>
+      </ul>
+    </div>
+    <a href="#/accounts" data-bn="accounts"><i class="bi bi-wallet2"></i>Accounts</a>
+    <button type="button" data-act="toggleSidebar"><i class="bi bi-grid"></i>More</button>
+  </nav>
 </div>
 
 <div id="modalHost"></div>
@@ -692,7 +775,7 @@ function toast(msg, type = 'success') {
 function modalShell(title, inner, { size = 'lg' } = {}) {
   const el = document.createElement('div'); el.className = 'modal fade'; el.tabIndex = -1;
   el.innerHTML = `<div class="modal-dialog modal-dialog-scrollable ${size === 'md' ? '' : 'modal-' + size} modal-fullscreen-sm-down"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" style="font-family:var(--display);font-weight:600">${title}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>${inner}</div></div>`;
-  $('#modalHost').appendChild(el); const m = new bootstrap.Modal(el); el.addEventListener('hidden.bs.modal', () => { m.dispose(); el.remove(); }); m.show(); return { el, m };
+  $('#modalHost').appendChild(el); const m = new bootstrap.Modal(el, { backdrop: 'static', keyboard: false }); el.addEventListener('hidden.bs.modal', () => { m.dispose(); el.remove(); }); m.show(); return { el, m };
 }
 function confirmDlg(msg, { title = 'Please confirm', ok = 'Confirm', danger = false } = {}) {
   return new Promise(res => {
@@ -2417,6 +2500,23 @@ const navLink = i => `<a class="sb-link" data-route="${i.r}" href="#/${i.r}"><i 
 function buildNav() { $('#sbNav').innerHTML = NAV.map(n => n.g ? `<div class="sb-group">${n.g}</div>` + n.items.map(navLink).join('') : navLink(n)).join(''); }
 ACTIONS.toggleSidebar = () => { $('#sidebar').classList.toggle('open'); $('#scrim').classList.toggle('show'); };
 ACTIONS.closeSidebar = () => { $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show'); };
+/* Display-only number roll-up on page open. Reads the text already drawn and restores it exactly; never touches data. */
+function countUp(root) {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.querySelectorAll('.stat .val, .acc-card .bal').forEach(el => {
+    if (el.children.length) return;
+    const full = el.textContent, m = full.match(/^([^\d]*)(\d[\d,]*)(\.\d+)?([^\d]*)$/); if (!m) return;
+    const target = +m[2].replace(/,/g, ''); if (!target) return;
+    const t0 = performance.now(), dur = 650;
+    const step = now => {
+      if (!el.isConnected || el.dataset.cu !== String(t0)) return;
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      if (k >= 1) { el.textContent = full; delete el.dataset.cu; return; }
+      el.textContent = m[1] + Math.round(target * e).toLocaleString('en-US') + (m[3] || '') + m[4]; requestAnimationFrame(step);
+    };
+    el.dataset.cu = String(t0); requestAnimationFrame(step);
+  });
+}
 function route() {
   if (!State.ready) return;
   destroyCharts();
@@ -2427,6 +2527,8 @@ function route() {
   const key = name + (sub ? '/' + sub : ''); let title = '';
   $$('.sb-link').forEach(a => { const on = a.dataset.route === key || (!sub && a.dataset.route === name) || (name === 'settings' && a.dataset.route === 'settings/' + (sub || 'profile')) || (name === 'settings' && ['notifications', 'appearance', 'data', 'security', 'history'].includes(sub) && a.dataset.route === 'settings/notifications'); a.classList.toggle('active', on); if (on && !title) title = a.textContent.trim(); });
   $('#topTitle').textContent = title || 'Money Manager'; ACTIONS.closeSidebar();
+  if (route._k !== key) { route._k = key; root.classList.remove('page-in'); void root.offsetWidth; root.classList.add('page-in'); countUp(root); window.scrollTo(0, 0); }
+  $$('.bottom-nav [data-bn]').forEach(a => a.classList.toggle('active', a.dataset.bn === name));
 }
 refreshHook = route;
 window.addEventListener('hashchange', route);
@@ -2513,6 +2615,7 @@ async function boot() {
 }
 window.MM = { State, D, Eng, effectsOf, effectOps, buildIncomeSave, buildExpenseSave, buildTransferSave, buildAssetSave, buildLiabilitySave, buildLoanGivenSave, buildSavingsSave, currentTotals, nw, totalsFor, getRange, prevRange, ledger, Lc, commit, ACTIONS, expectedBalance, budgetStatus, nextOcc, boot, route, dueStatus, loanDueStatus, liabOutstanding, savingsBalance, sha256Hex, buildInsights, growthSeries, trendData, seedDefaults };
 boot();
+if ('serviceWorker' in navigator && location.protocol === 'https:') window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker not registered', e)); });
 })();
 </script>
 </body>
